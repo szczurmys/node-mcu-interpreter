@@ -8,8 +8,7 @@ The project which pretends LUA interpreter. For example, to use in Eclipse plugi
 
 ###Help:
 ```
-java -jar interpreter.jar [OPTIONS] <MAIN_FILE>
-java -jar interpreter.jar -h|--help
+node-mcu-interpreter-0.1-alpha_with_jssc_lib.exe [OPTIONS] <MAIN_FILE>
 
 MAIN_FILE - file to run and copy file from parent directory.
 OPTIONS:
