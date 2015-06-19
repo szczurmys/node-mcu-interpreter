@@ -6,7 +6,7 @@
 
     <groupId>pl.szczurmys.nodemcu</groupId>
     <artifactId>node-mcu-interpreter</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.0.1</version>
 
     <dependencies>
         <dependency>
@@ -39,7 +39,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <finalName>${artifactId}-${version}-onejar</finalName>
+                    <finalName>${artifactId}-${version}_with_jssc_lib</finalName>
                 </configuration>
             </plugin>
 
