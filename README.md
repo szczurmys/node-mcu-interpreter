@@ -27,4 +27,4 @@ OPTIONS:
 ```
 
 ###Eclipse
-Window->Preferences->Lua->Interpreters->Add->InterpreterType:GenericLua;Interpreter executable:EXEC_INTERPRETER<br />
+Window->Preferences->Lua->Interpreters->Add->InterpreterType:GenericLua;InterpreterExecutable:EXEC_INTERPRETER
