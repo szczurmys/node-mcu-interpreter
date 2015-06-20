@@ -36,6 +36,11 @@ public class Interpreter {
 		Set<String> excludeFiles = new HashSet<String>();
 		int baudRate = NodeMcuInterpreter.DEFAULT_BAUD_RATE;
 
+
+		boolean compile = false;
+		boolean removeSourceAfterCompile = true;
+
+
 		if (args.length == 0) {
 			System.err.println("Error: Lack parameters.");
 			System.err.println();
@@ -100,6 +105,13 @@ public class Interpreter {
 				if ("-i".equals(v)) {
 					ignoreDirectories = true;
 				}
+				if ("-c".equals(v)) {
+					compile = true;
+				}
+				if ("-cr".equals(v)) {
+					compile = true;
+					removeSourceAfterCompile = true;
+				}
 				if ("-nw".equals(v)) {
 					waitForOutput = false;
 				}
@@ -116,7 +128,7 @@ public class Interpreter {
 
 			}
 		}
-		
+
 		if(baudRate <= 0) {
 			System.err.println("BaudRate must be greater than 0!");
 			System.exit(ErrorCode.BAUD_RATE_MUST_BE_GREATER_THAN_0.code());
@@ -212,7 +224,10 @@ public class Interpreter {
 				return;
 			}));
 
-			FileWriter fileWriter = new FileWriter(parentDirectory, interpreter, onlyRemoveFiles, ignoreDirectories, excludeFiles);
+			FileWriter fileWriter = new FileWriter(parentDirectory,
+					interpreter, onlyRemoveFiles,
+					ignoreDirectories, excludeFiles,
+					compile, removeSourceAfterCompile);
 			if (sendOnlyOne) {
 				if (ignoreDirectories &&
 						!fileToRun.getParentFile().getAbsolutePath().equals(parentDirectory.getAbsolutePath())) {
@@ -227,7 +242,12 @@ public class Interpreter {
 			}
 
 			if (!notRunOnlySave && !excludeFiles.contains(fileToRunRelative)) {
-				interpreter.runFile(fileToRunRelative, waitForOutput);
+				String fileToRunOnDevice = fileToRunRelative;
+				if(compile) {
+					String[] partFile = FileHelper.getNameAndExtensionFile(fileToRunOnDevice);
+					fileToRunOnDevice = partFile[0] + ".lc";
+				}
+				interpreter.runFile(fileToRunOnDevice, waitForOutput);
 			}
 
 		} catch (SerialPortException e) {
@@ -271,6 +291,8 @@ public class Interpreter {
 		System.out.println(createOptionHelp("-i", "ignore files in directories"));
 		System.out.println(createOptionHelp("-nw", "not wait for output"));
 		System.out.println(createOptionHelp("-b=BAUD_RATE", "baud rate, default - " + NodeMcuInterpreter.DEFAULT_BAUD_RATE));
+		System.out.println(createOptionHelp("-c", "compile *.lua files."));
+		System.out.println(createOptionHelp("-cr", "compile and next remove *.lua files (include -c)"));
 	}
 
 	private static String createOptionHelp(String option, String help) {

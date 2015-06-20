@@ -193,6 +193,23 @@ public class NodeMcuInterpreter implements Closeable {
 
 		tryCloseFile();
 	}
+	public void compile(String file) throws SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
+		String command = String.format("node.compile(\"%s\");", file);
+		String resultCommand = writeAndReadRepeatedCommand(command);
+		if (!resultCommand.contains(command)) {
+			throw new SerialPortException(port, "compile", String.format(
+					"\r\nResult command: %s \r\n" +
+							"not equals with command: %s",
+					resultCommand.trim(),
+					command
+			));
+		}
+		System.out.println(resultCommand.trim());
+		return;
+
+	}
 
 	private void tryCloseFile() {
 		String command = String.format("file.close();");
