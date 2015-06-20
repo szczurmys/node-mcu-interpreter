@@ -116,6 +116,13 @@ public class Interpreter {
 
 			}
 		}
+		
+		if(baudRate <= 0) {
+			System.err.println("BaudRate must be greater than 0!");
+			System.exit(ErrorCode.BAUD_RATE_MUST_BE_GREATER_THAN_0.code());
+			return;
+		}
+
 		if (!fileToRun.getAbsolutePath().startsWith(parentDirectory.getAbsolutePath())) {
 			System.err.println("Parent dir must be also parent for main file!");
 			System.err.println("Parent dir: " + parentDirectory.getAbsolutePath());
