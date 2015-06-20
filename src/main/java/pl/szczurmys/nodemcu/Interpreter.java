@@ -34,6 +34,7 @@ public class Interpreter {
 		boolean waitForOutput = true;
 		String[] excludeFilesInString = new String[0];
 		Set<String> excludeFiles = new HashSet<String>();
+		int baudRate = NodeMcuInterpreter.DEFAULT_BAUD_RATE;
 
 		if (args.length == 0) {
 			System.err.println("Error: Lack parameters.");
@@ -108,6 +109,9 @@ public class Interpreter {
 				}
 				if (v.startsWith("-d=")) {
 					parentDirectory = new File(v.substring(3));
+				}
+				if (v.startsWith("-b=")) {
+					baudRate = Integer.parseInt(v.substring(3));
 				}
 
 			}
@@ -192,7 +196,7 @@ public class Interpreter {
 		System.out.println("Only remove files: " + onlyRemoveFiles);
 		System.out.println("Selected port: " + port);
 
-		try (final NodeMcuInterpreter interpreter = new NodeMcuInterpreter(port, endCommand, timeout)) {
+		try (final NodeMcuInterpreter interpreter = new NodeMcuInterpreter(port, endCommand, baudRate, timeout)) {
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				if (nonNull(interpreter) && !interpreter.isClosed()) {
 					interpreter.close();
@@ -259,6 +263,7 @@ public class Interpreter {
 		System.out.println(createOptionHelp("-R", "only remove files from device"));
 		System.out.println(createOptionHelp("-i", "ignore files in directories"));
 		System.out.println(createOptionHelp("-nw", "not wait for output"));
+		System.out.println(createOptionHelp("-b=BAUD_RATE", "baud rate, default - " + NodeMcuInterpreter.DEFAULT_BAUD_RATE));
 	}
 
 	private static String createOptionHelp(String option, String help) {
