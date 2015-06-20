@@ -8,8 +8,8 @@ The project which pretends LUA interpreter. For example, to use in Eclipse plugi
 
 ###Help:
 ```
-node-mcu-interpreter-0.2-alpha_with_jssc_lib.exe [OPTIONS] <MAIN_FILE>
-node-mcu-interpreter-0.2-alpha_with_jssc_lib.exe -h|--help
+node-mcu-interpreter-0.3-alpha_with_jssc_lib.exe [OPTIONS] <MAIN_FILE>
+node-mcu-interpreter-0.3-alpha_with_jssc_lib.exe -h|--help
 
 MAIN_FILE - file to run and copy file from parent directory.
 OPTIONS:
@@ -25,6 +25,7 @@ OPTIONS:
   -R                        - only remove files from device
   -i                        - ignore files in directories
   -nw                       - not wait for output
+  -b=BAUD_RATE              - baud rate, default - 9600
 ```
 
 ###Eclipse
