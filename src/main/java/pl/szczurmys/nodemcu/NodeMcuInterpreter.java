@@ -3,17 +3,26 @@ package pl.szczurmys.nodemcu;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
+import pl.szczurmys.nodemcu.event.SelectorEventListener;
 
 import java.io.*;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
+import static pl.szczurmys.nodemcu.event.SelectorEventListener.EventType.*;
 
 /**
  * @author szczurmys
  */
 public class NodeMcuInterpreter implements Closeable {
 	public static final int DEFAULT_TIMEOUT = 10000;
+	public static final int DEFAULT_BAUD_RATE = SerialPort.BAUDRATE_9600;
+
+	public static final int REPEATED_DETECTED_TIMES = 100;
+
+	private final SelectorEventListener selectorEventListener;
 
 	private String port;
 	private SerialPort serialPort;
@@ -21,18 +30,34 @@ public class NodeMcuInterpreter implements Closeable {
 	private int timeout;
 	private boolean closed = false;
 
+	private final LineQueue lineQueue = new LineQueue();
+	private final AtomicBoolean detected = new AtomicBoolean(false);
+
 
 	public NodeMcuInterpreter(String port, String endCommand) throws SerialPortException, DetectedException, SerialPortTimeoutException {
 
-		this(port, endCommand, DEFAULT_TIMEOUT);
+		this(port, endCommand, DEFAULT_BAUD_RATE, DEFAULT_TIMEOUT);
 	}
 
-	public NodeMcuInterpreter(String port, String endCommand, int timeout) throws SerialPortException, DetectedException, SerialPortTimeoutException {
+	public NodeMcuInterpreter(String port, String endCommand, int baudRate) throws SerialPortException, DetectedException, SerialPortTimeoutException {
+
+		this(port, endCommand, baudRate, DEFAULT_TIMEOUT);
+	}
+
+	public NodeMcuInterpreter(String port, String endCommand, int baudRate, int timeout) throws SerialPortException, DetectedException, SerialPortTimeoutException {
 		this.port = port;
 		this.endCommand = endCommand;
 		this.timeout = timeout;
 		this.serialPort = new SerialPort(port);
 		this.serialPort.openPort();
+		this.serialPort.setParams(baudRate,
+				SerialPort.DATABITS_8,
+				SerialPort.STOPBITS_1,
+				SerialPort.PARITY_NONE);
+
+		selectorEventListener = new SelectorEventListener(serialPort, detected, lineQueue, timeout);
+		serialPort.addEventListener(selectorEventListener);
+
 		testCommand();
 
 	}
@@ -40,6 +65,12 @@ public class NodeMcuInterpreter implements Closeable {
 	@Override
 	public void close() {
 		if (nonNull(serialPort)) {
+			try {
+				serialPort.removeEventListener();
+			} catch (SerialPortException e) {
+				System.err.println("Error when try removeEventListener, '" + port + "'. Message: " + e.getMessage());
+				e.printStackTrace();
+			}
 			try {
 				serialPort.closePort();
 			} catch (SerialPortException e) {
@@ -55,6 +86,8 @@ public class NodeMcuInterpreter implements Closeable {
 	}
 
 	public void deleteFile(String file) throws SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
 		String command = String.format("file.remove(\"%s\");", file);
 		String resultCommand = writeAndReadRepeatedCommand(command);
 		if (!resultCommand.contains(command)) {
@@ -81,6 +114,8 @@ public class NodeMcuInterpreter implements Closeable {
 	}
 
 	public void runFile(String file, boolean waitForOutputs) throws SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
 		String command = String.format("dofile(\"%s\");", file);
 		String resultCommand = writeAndReadRepeatedCommand(command);
 		if (!resultCommand.contains(command)) {
@@ -92,6 +127,8 @@ public class NodeMcuInterpreter implements Closeable {
 		System.out.println(resultCommand.trim());
 
 		if (waitForOutputs) {
+			selectorEventListener.setEventType(READ_ALL_MASK);
+
 			System.out.println("OUTPUT.");
 			System.out.println("If you want exit, press enter.");
 			System.out.println("----------------------------------------------------------------");
@@ -101,10 +138,6 @@ public class NodeMcuInterpreter implements Closeable {
 
 			try {
 				while (!br.ready()) {
-					String ret = serialPort.readString();
-					if (nonNull(ret) && !ret.isEmpty()) {
-						System.out.print(ret);
-					}
 					try {
 						Thread.sleep(10);
 					} catch (InterruptedException ignore) {
@@ -119,6 +152,8 @@ public class NodeMcuInterpreter implements Closeable {
 
 
 	public void saveFile(String file, Reader reader) throws IOException, SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
 		String command = String.format("file.open(\"%s\",\"w+\");", file);
 		String resultCommand = writeAndReadRepeatedCommand(command);
 		if (!command.trim().equals(resultCommand.trim())) {
@@ -175,6 +210,27 @@ public class NodeMcuInterpreter implements Closeable {
 
 
 	private void testCommand() throws SerialPortException, SerialPortTimeoutException, DetectedException {
+		selectorEventListener.setEventType(DETECT_MASK);
+		System.out.print("Wait for device response .");
+
+		for (int i = 0; i < REPEATED_DETECTED_TIMES && !detected.get(); i++) {
+			writeLine("");
+			try {
+				Thread.sleep(300);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				break;
+			}
+			System.out.print(".");
+		}
+		System.out.println();
+		if (!detected.get()) {
+			throw new DetectedException("Device not response.");
+		}
+		System.out.println("OK");
+
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
 		String command = "majorVer, minorVer, devVer, chipid, flashid, flashsize, flashmode, flashspeed = node.info();";
 
 		String resultCommand1 = writeAndReadRepeatedCommand(command);
@@ -188,6 +244,7 @@ public class NodeMcuInterpreter implements Closeable {
 		}
 		System.out.println(version.trim());
 
+
 	}
 
 	private void writeLine(String command) throws SerialPortException, SerialPortTimeoutException {
@@ -200,33 +257,20 @@ public class NodeMcuInterpreter implements Closeable {
 	private String writeAndReadRepeatedCommand(String command) throws SerialPortException, SerialPortTimeoutException {
 		writeLine(command);
 		String readLine = readLine();
+
 		if (!command.startsWith("> ") && readLine.startsWith("> ")) {
 			readLine = readLine.substring(2);
 		}
-
 		return readLine;
 	}
 
 
-	private String readLine() throws SerialPortException, SerialPortTimeoutException {
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		long timeoutTime = System.currentTimeMillis() + timeout;
-		byte[] bs;
-		byte b = 0;
-		do {
-			if (timeoutTime < System.currentTimeMillis()) {
-				throw new SerialPortTimeoutException(port, "readLine", timeout);
-			}
-			bs = serialPort.readBytes(1, timeout);
-			if (nonNull(bs) && bs.length > 0) {
-				b = bs[0];
-				bos.write(b);
-			}
-		} while (((byte) '\n') != b);
-
-		String resultCommand = new String(bos.toByteArray());
-
-		return resultCommand;
+	private String readLine() throws SerialPortTimeoutException {
+		try {
+			return lineQueue.waitForLine(timeout);
+		} catch (TimeoutException e) {
+			throw new SerialPortTimeoutException(port, "waitForLine", timeout);
+		}
 	}
 
 
