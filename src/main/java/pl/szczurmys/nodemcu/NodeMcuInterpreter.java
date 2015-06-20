@@ -6,6 +6,7 @@ import jssc.SerialPortTimeoutException;
 import pl.szczurmys.nodemcu.event.SelectorEventListener;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -29,6 +30,7 @@ public class NodeMcuInterpreter implements Closeable {
 	private String endCommand;
 	private int timeout;
 	private boolean closed = false;
+	private int baudRate = DEFAULT_BAUD_RATE;
 
 	private final LineQueue lineQueue = new LineQueue();
 	private final AtomicBoolean detected = new AtomicBoolean(false);
@@ -48,6 +50,7 @@ public class NodeMcuInterpreter implements Closeable {
 		this.port = port;
 		this.endCommand = endCommand;
 		this.timeout = timeout;
+		this.baudRate = baudRate;
 		this.serialPort = new SerialPort(port);
 		this.serialPort.openPort();
 		this.serialPort.setParams(baudRate,
@@ -102,17 +105,6 @@ public class NodeMcuInterpreter implements Closeable {
 		return;
 	}
 
-	public void saveFile(String file, String content) throws IOException, SerialPortException, SerialPortTimeoutException {
-		StringReader stringReader = new StringReader(content);
-		saveFile(file, stringReader);
-	}
-
-
-	public void saveFile(String file, InputStream inputStream) throws IOException, SerialPortException, SerialPortTimeoutException {
-		InputStreamReader reader = new InputStreamReader(inputStream);
-		saveFile(file, reader);
-	}
-
 	public void runFile(String file, boolean waitForOutputs) throws SerialPortException, SerialPortTimeoutException {
 		selectorEventListener.setEventType(READ_LINE_MASK);
 
@@ -150,49 +142,6 @@ public class NodeMcuInterpreter implements Closeable {
 
 	}
 
-
-	public void saveFile(String file, Reader reader) throws IOException, SerialPortException, SerialPortTimeoutException {
-		selectorEventListener.setEventType(READ_LINE_MASK);
-
-		String command = String.format("file.open(\"%s\",\"w+\");", file);
-		String resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "saveFile", "Cannot open file to write. Device return: " + resultCommand);
-		}
-		System.out.println(resultCommand.trim());
-
-		command = String.format("w = file.writeline;", file);
-		resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "saveFile", "Cannot get writeline. Device return: " + resultCommand);
-		}
-		System.out.println(resultCommand.trim());
-
-		BufferedReader bufferedReader = new BufferedReader(reader);
-
-		String line;
-		while (nonNull(line = bufferedReader.readLine())) {
-			command = String.format("w([[%s]]);", line);
-			resultCommand = writeAndReadRepeatedCommand(command);
-			if (!command.trim().equals(resultCommand.trim())) {
-				tryCloseFile();
-				throw new SerialPortException(port, "saveFile", "Cannot write line. Device return: " + resultCommand);
-			}
-			System.out.println(resultCommand.trim());
-		}
-
-		command = String.format("w = nil;", file);
-		resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "saveFile", "Cannot reset variable 'w'. Device return: " + resultCommand);
-		}
-		System.out.println(resultCommand.trim());
-
-		tryCloseFile();
-	}
 	public void compile(String file) throws SerialPortException, SerialPortTimeoutException {
 		selectorEventListener.setEventType(READ_LINE_MASK);
 
@@ -210,6 +159,97 @@ public class NodeMcuInterpreter implements Closeable {
 		return;
 
 	}
+
+
+	public void saveFile(String file, InputStream inputStream) throws IOException, SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
+		String command = String.format("file.open(\"%s\",\"w+\");", file);
+		String resultCommand = writeAndReadRepeatedCommand(command);
+		if (!command.trim().equals(resultCommand.trim())) {
+			tryCloseFile();
+			throw new SerialPortException(port, "saveFile", "Cannot open file to write. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+
+
+		uartSave(inputStream);
+
+
+		tryCloseFile();
+
+	}
+
+	private void uartSave(InputStream inputStream) throws IOException, SerialPortException, SerialPortTimeoutException {
+		byte[] buffer = new byte[255];
+		int size;
+
+
+		String command = String.format("uart.setup(0,%d,8,1,1);", baudRate);
+		String resultCommand = writeAndReadRepeatedCommand(command);
+		if (!command.trim().equals(resultCommand.trim())) {
+			tryCloseFile();
+			throw new SerialPortException(port, "uartSave", "Cannot first setup UART. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+
+		do {
+			size = inputStream.read(buffer);
+			if(size > 0) {
+
+				byte[] blockToSend;
+				if(size < buffer.length) {
+					blockToSend = Arrays.copyOfRange(buffer, 0, size);
+				} else {
+					blockToSend = buffer;
+				}
+				uartSendBlock(blockToSend);
+
+			}
+		} while (size > 0);
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
+		command = String.format("uart.setup(0,%d,8,1,1);", baudRate);
+		resultCommand = writeAndReadRepeatedCommand(command);
+		if (!command.trim().equals(resultCommand.trim())) {
+			tryCloseFile();
+			throw new SerialPortException(port, "uartSave", "Cannot first setup UART. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+
+		command = String.format("uart.on('data');", baudRate);
+		resultCommand = writeAndReadRepeatedCommand(command);
+		if (!command.trim().equals(resultCommand.trim())) {
+			tryCloseFile();
+			throw new SerialPortException(port, "uartSave", "Cannot on UART. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+	}
+
+	public void uartSendBlock(byte[] block) throws SerialPortException, SerialPortTimeoutException {
+		selectorEventListener.setEventType(READ_LINE_MASK);
+
+
+		String command = String.format("uart.on(\"data\", %d, function(input) file.write(input) uart.write(0, \"ACK\\r\\n\") uart.on(\"data\")  end, 0);", block.length);
+		String resultCommand = writeAndReadRepeatedCommand(command);
+		if (!command.trim().equals(resultCommand.trim())) {
+			tryCloseFile();
+			throw new SerialPortException(port, "uartSendBlock", "Cannot on UART. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+		System.out.println("Write block. Size: " + block.length);
+		serialPort.writeBytes(block);
+		resultCommand = readLine();
+		if(!"> ACK".equals(resultCommand.trim())) {
+			throw new SerialPortException(port, "uartSendBlock", "Error when try send block by UART. Device return: " + resultCommand);
+		}
+		System.out.println(resultCommand.trim());
+
+
+		return;
+	}
+
+
 
 	private void tryCloseFile() {
 		String command = String.format("file.close();");
