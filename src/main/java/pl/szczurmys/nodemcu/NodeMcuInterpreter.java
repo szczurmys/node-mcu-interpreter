@@ -31,6 +31,7 @@ public class NodeMcuInterpreter implements Closeable {
 	private int timeout;
 	private boolean closed = false;
 	private int baudRate = DEFAULT_BAUD_RATE;
+	private boolean uartSetup = false;
 
 	private final LineQueue lineQueue = new LineQueue();
 	private final AtomicBoolean detected = new AtomicBoolean(false);
@@ -183,15 +184,18 @@ public class NodeMcuInterpreter implements Closeable {
 	private void uartSave(InputStream inputStream) throws IOException, SerialPortException, SerialPortTimeoutException {
 		byte[] buffer = new byte[255];
 		int size;
-
-
-		String command = String.format("uart.setup(0,%d,8,1,1);", baudRate);
-		String resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "uartSave", "Cannot first setup UART. Device return: " + resultCommand);
+		String command;
+		String resultCommand;
+		if(!uartSetup) {
+			command = String.format("uart.setup(0,%d,8,1,1);", baudRate);
+			resultCommand = writeAndReadRepeatedCommand(command);
+			if (!command.trim().equals(resultCommand.trim())) {
+				tryCloseFile();
+				throw new SerialPortException(port, "uartSave", "Cannot first setup UART. Device return: " + resultCommand);
+			}
+			System.out.println(resultCommand.trim());
+			uartSetup = true;
 		}
-		System.out.println(resultCommand.trim());
 
 		do {
 			size = inputStream.read(buffer);
@@ -208,14 +212,6 @@ public class NodeMcuInterpreter implements Closeable {
 			}
 		} while (size > 0);
 		selectorEventListener.setEventType(READ_LINE_MASK);
-
-		command = String.format("uart.setup(0,%d,8,1,1);", baudRate);
-		resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "uartSave", "Cannot first setup UART. Device return: " + resultCommand);
-		}
-		System.out.println(resultCommand.trim());
 
 		command = String.format("uart.on('data');", baudRate);
 		resultCommand = writeAndReadRepeatedCommand(command);
