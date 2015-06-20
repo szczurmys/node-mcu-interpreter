@@ -33,7 +33,9 @@ public class Interpreter {
 		boolean ignoreDirectories = false;
 		boolean waitForOutput = true;
 		String[] excludeFilesInString = new String[0];
-		Set<String> excludeFiles = new HashSet<String>();
+		Set<String> excludeFiles = new HashSet<>();
+		String[] ignoreCompileFilesInString = new String[0];
+		Set<String> ignoreCompileFiles = new HashSet<>();
 		int baudRate = NodeMcuInterpreter.DEFAULT_BAUD_RATE;
 
 
@@ -88,7 +90,7 @@ public class Interpreter {
 					port = v.substring(3);
 				}
 				if (v.startsWith("-e=")) {
-					excludeFilesInString = v.substring(3).split(",");
+					excludeFilesInString = v.substring(4).split(",");
 				}
 				if ("-o".equals(v)) {
 					sendOnlyOne = true;
@@ -111,6 +113,9 @@ public class Interpreter {
 				if ("-cr".equals(v)) {
 					compile = true;
 					removeSourceAfterCompile = true;
+				}
+				if (v.startsWith("-ic=")) {
+					ignoreCompileFilesInString = v.substring(4).split(",");
 				}
 				if ("-nw".equals(v)) {
 					waitForOutput = false;
@@ -135,7 +140,13 @@ public class Interpreter {
 			return;
 		}
 
-		if (!fileToRun.getAbsolutePath().startsWith(parentDirectory.getAbsolutePath())) {
+
+		String fileToRunRelative = FileHelper.getUnixRelativePath(
+				parentDirectory,
+				fileToRun
+		);
+
+		if (parentDirectory.compareTo(fileToRun)>-2) {
 			System.err.println("Parent dir must be also parent for main file!");
 			System.err.println("Parent dir: " + parentDirectory.getAbsolutePath());
 			System.err.println("Main file:  " + fileToRun.getAbsolutePath());
@@ -159,6 +170,23 @@ public class Interpreter {
 					file = file.substring(1);
 				}
 				excludeFiles.add(file);
+			}
+		});
+		Stream.of(ignoreCompileFilesInString).forEach(v -> {
+			File tempF = new File(v);
+			if (tempF.isAbsolute()) {
+				if (tempF.getAbsolutePath().startsWith(parentForLambda.getAbsolutePath())) {
+					ignoreCompileFiles.add(FileHelper.getUnixRelativePath(
+							parentForLambda,
+							tempF
+					));
+				}
+			} else {
+				String file = v.trim().replace('\\', '/');
+				if (file.startsWith("/")) {
+					file = file.substring(1);
+				}
+				ignoreCompileFiles.add(file);
 			}
 		});
 
@@ -202,10 +230,6 @@ public class Interpreter {
 				return;
 			}
 		}
-		String fileToRunRelative = FileHelper.getUnixRelativePath(
-				parentDirectory,
-				fileToRun
-		);
 
 		System.out.println("File to run: " + fileToRun.getAbsolutePath());
 		System.out.println("File to run relative: " + fileToRunRelative);
@@ -226,7 +250,7 @@ public class Interpreter {
 
 			FileWriter fileWriter = new FileWriter(parentDirectory,
 					interpreter, onlyRemoveFiles,
-					ignoreDirectories, excludeFiles,
+					ignoreDirectories, excludeFiles, ignoreCompileFiles,
 					compile, removeSourceAfterCompile);
 			if (sendOnlyOne) {
 				if (ignoreDirectories &&
@@ -243,7 +267,7 @@ public class Interpreter {
 
 			if (!notRunOnlySave && !excludeFiles.contains(fileToRunRelative)) {
 				String fileToRunOnDevice = fileToRunRelative;
-				if(compile) {
+				if(compile && !ignoreCompileFiles.contains(fileToRunRelative)) {
 					String[] partFile = FileHelper.getNameAndExtensionFile(fileToRunOnDevice);
 					fileToRunOnDevice = partFile[0] + ".lc";
 				}
@@ -293,6 +317,7 @@ public class Interpreter {
 		System.out.println(createOptionHelp("-b=BAUD_RATE", "baud rate, default - " + NodeMcuInterpreter.DEFAULT_BAUD_RATE));
 		System.out.println(createOptionHelp("-c", "compile *.lua files."));
 		System.out.println(createOptionHelp("-cr", "compile and next remove *.lua files (include -c)"));
+		System.out.println(createOptionHelp("-ic=file1,...,file", "ignore file to compile"));
 	}
 
 	private static String createOptionHelp(String option, String help) {

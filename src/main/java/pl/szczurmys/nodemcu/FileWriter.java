@@ -20,12 +20,14 @@ public class FileWriter {
 	private final boolean onlyRemoveFiles;
 	private final boolean ignoreDirectories;
 	private final Collection<String> excludeFiles;
+	private final Collection<String> ignoreCompileFiles;
 	private final boolean compile;
 	private final boolean removeSourceAfterCompile;
 
 	public FileWriter(File directory, NodeMcuInterpreter interpreter,
 					  boolean onlyRemoveFiles, boolean ignoreDirectories,
 					  Collection<String> excludeFiles,
+					  Collection<String> ignoreCompileFiles,
 					  boolean compile, boolean removeSourceAfterCompile) {
 
 		this.directory = directory;
@@ -33,6 +35,7 @@ public class FileWriter {
 		this.onlyRemoveFiles = onlyRemoveFiles;
 		this.ignoreDirectories = ignoreDirectories;
 		this.excludeFiles = excludeFiles;
+		this.ignoreCompileFiles = ignoreCompileFiles;
 		this.compile = compile;
 		this.removeSourceAfterCompile = removeSourceAfterCompile;
 	}
@@ -69,6 +72,10 @@ public class FileWriter {
 			throw new IOException("File '" + file.getAbsolutePath() + "' is not file!");
 		}
 		String relativePath = FileHelper.getUnixRelativePath(directory, file);
+		boolean fileIgnoreInCompile = false;
+		if(ignoreCompileFiles.contains(relativePath)) {
+			fileIgnoreInCompile = true;
+		}
 
 		if (excludeFiles.contains(relativePath)) {
 			System.out.println("Exclude file " + file.getAbsolutePath());
@@ -80,7 +87,7 @@ public class FileWriter {
 
 		interpreter.deleteFile(relativePath);
 
-		if(compile && nonNull(partFile) && partFile.length == 2 && "lua".equals(partFile[1].trim().toLowerCase())) {
+		if(!fileIgnoreInCompile && compile && nonNull(partFile) && partFile.length == 2 && "lua".equals(partFile[1].trim().toLowerCase())) {
 			interpreter.deleteFile(partFile[0] + ".lc");
 			isLuaFileForCompile = true;
 		}

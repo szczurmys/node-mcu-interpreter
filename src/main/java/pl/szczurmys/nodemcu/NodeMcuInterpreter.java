@@ -212,14 +212,6 @@ public class NodeMcuInterpreter implements Closeable {
 			}
 		} while (size > 0);
 		selectorEventListener.setEventType(READ_LINE_MASK);
-
-		command = String.format("uart.on('data');", baudRate);
-		resultCommand = writeAndReadRepeatedCommand(command);
-		if (!command.trim().equals(resultCommand.trim())) {
-			tryCloseFile();
-			throw new SerialPortException(port, "uartSave", "Cannot on UART. Device return: " + resultCommand);
-		}
-		System.out.println(resultCommand.trim());
 	}
 
 	public void uartSendBlock(byte[] block) throws SerialPortException, SerialPortTimeoutException {
