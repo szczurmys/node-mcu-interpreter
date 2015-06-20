@@ -91,9 +91,9 @@ public class FileWriter {
 					interpreter.saveFile(relativePath, inputStream);
 					if(isLuaFileForCompile) {
 						interpreter.compile(relativePath);
-					}
-					if(removeSourceAfterCompile) {
-						interpreter.deleteFile(relativePath);
+						if(removeSourceAfterCompile) {
+							interpreter.deleteFile(relativePath);
+						}
 					}
 				} catch (SerialPortException | SerialPortTimeoutException e) {
 					try {
