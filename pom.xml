@@ -6,7 +6,7 @@
 
     <groupId>pl.szczurmys.nodemcu</groupId>
     <artifactId>node-mcu-interpreter</artifactId>
-    <version>0.2-alpha</version>
+    <version>0.3-alpha</version>
 
     <dependencies>
         <dependency>
