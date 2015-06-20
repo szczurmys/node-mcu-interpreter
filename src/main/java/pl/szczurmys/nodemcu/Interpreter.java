@@ -46,6 +46,12 @@ public class Interpreter {
 
 		for (int i = 0; i < args.length; i++) {
 			String v = args[i];
+			
+			if ("-h".equals(v) || "--help".equals(v)) {
+				printHelp();
+				System.exit(ErrorCode.SUCCESS.code());
+				return;
+			}
 
 			if (i == args.length - 1) {
 				fileToRun = new File(args[args.length - 1]);
@@ -66,12 +72,6 @@ public class Interpreter {
 			}
 
 			if (i < args.length - 1) {
-
-				if ("-h".equals(v) || "--help".equals(v)) {
-					printHelp();
-					System.exit(ErrorCode.SUCCESS.code());
-					return;
-				}
 				if (v.startsWith("-l=")) {
 					endCommand = v.substring(3)
 							.replaceAll("\\r", "\r")
