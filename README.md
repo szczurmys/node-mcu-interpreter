@@ -26,6 +26,9 @@ OPTIONS:
   -i                        - ignore files in directories
   -nw                       - not wait for output
   -b=BAUD_RATE              - baud rate, default - 9600
+  -c                        - compile *.lua files.
+  -cr                       - compile and next remove *.lua files (include -c)
+  -ic=file1,...,file        - ignore file to compile
 ```
 
 ###Eclipse
