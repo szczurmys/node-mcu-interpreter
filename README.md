@@ -1,12 +1,12 @@
 # node-mcu-interpreter
 The project which pretends LUA interpreter. For example, to use in Eclipse plugin Lua Development Tools
 
-##THIS TOOL IS IN REALLY REALLY REALLY REALLY EARLY STAGE
-###You use interpreter at your own risk!
-##Tested only on Windows operating system.
+## THIS TOOL IS IN REALLY REALLY REALLY REALLY EARLY STAGE
+### You use interpreter at your own risk!
+## Tested only on Windows operating system.
 
 
-###Help:
+### Help:
 ```
 node-mcu-interpreter-0.3-alpha_with_jssc_lib.exe [OPTIONS] <MAIN_FILE>
 node-mcu-interpreter-0.3-alpha_with_jssc_lib.exe -h|--help
@@ -31,5 +31,5 @@ OPTIONS:
   -ic=file1,...,file        - ignore file to compile
 ```
 
-###Eclipse
+### Eclipse
 Window->Preferences->Lua->Interpreters->Add->InterpreterType:GenericLua;InterpreterExecutable:EXEC_INTERPRETER
